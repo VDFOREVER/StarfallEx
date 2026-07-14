@@ -167,7 +167,26 @@ if SERVER then
 	-- @param string text Content of the message
 	-- @param boolean teamChat True if team chat
 	-- @return string? New text. "" to stop from displaying. Nil to keep original.
-	add("PlayerSay", nil, nil, returnOnlyOnYourself, true)
+	--- Called when a player sends a chat message
+	-- @name PlayerSay
+	-- @class hook
+	-- @server
+	-- @param Player ply Player that sent the message
+	-- @param string text Content of the message
+	-- @param boolean teamChat True if team chat
+	-- @return string? New text. "" to stop from displaying. Nil to keep original.
+	add("PlayerSay", nil, function(instance, ply, text, teamChat, isLocal)
+		if isLocal and instance.player ~= ply then
+			return false
+		end
+
+		return true, {
+			instance.WrapObject(ply),
+			text,
+			teamChat,
+			isLocal
+		}
+	end, returnOnlyOnYourself, true)
 	
 	-- Serverside implementation of playerchat
 	gameevent.Listen("player_say")
