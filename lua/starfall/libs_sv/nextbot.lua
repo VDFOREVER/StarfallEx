@@ -18,13 +18,13 @@ SF.RegisterType("NextBot", "entity", nil, FindMetaTable("NextBot"), "Entity")
 SF.RegisterLibrary("nextbot")
 
 registerprivilege("nextbot.create", "Create nextbot", "Allows the user to create nextbots.")
-registerprivilege("nextbot.remove", "Remove a nextbot", "Allows the user to remove a nextbot.", {entites = {}})
-registerprivilege("nextbot.setGotoPos", "Set nextbot goto pos", "Allows the user to set a vector pos for the nextbot to try and go to.", {entites = {}})
-registerprivilege("nextbot.setApproachPos", "Nextbot approach goal", "Allows the user to make a nextbot approach a specified Vector.", {entites = {}})
-registerprivilege("nextbot.removeApproachPos", "Nextbot approach goal", "Allows the user to remove the approach pos from a nextbot.", {entites = {}})
-registerprivilege("nextbot.removeGotoPos", "Remove nextbot goto pos", "Allows the user to remove the goto pos from a nextbot.", {entites = {}})
-registerprivilege("nextbot.playSequence", "Play nextbot sequence", "Allows the user to set an animation for the nextbot to play.", {entites = {}})
-registerprivilege("nextbot.startActivity", "Play nextbot activity", "Allows the user to set an activity for the nextbot to play.", {entites = {}})
+registerprivilege("nextbot.remove", "Remove a nextbot", "Allows the user to remove a nextbot.", {entities = {}})
+registerprivilege("nextbot.setGotoPos", "Set nextbot goto pos", "Allows the user to set a vector pos for the nextbot to try and go to.", {entities = {}})
+registerprivilege("nextbot.setApproachPos", "Nextbot approach goal", "Allows the user to make a nextbot approach a specified Vector.", {entities = {}})
+registerprivilege("nextbot.removeApproachPos", "Nextbot approach goal", "Allows the user to remove the approach pos from a nextbot.", {entities = {}})
+registerprivilege("nextbot.removeGotoPos", "Remove nextbot goto pos", "Allows the user to remove the goto pos from a nextbot.", {entities = {}})
+registerprivilege("nextbot.playSequence", "Play nextbot sequence", "Allows the user to set an animation for the nextbot to play.", {entities = {}})
+registerprivilege("nextbot.startActivity", "Play nextbot activity", "Allows the user to set an activity for the nextbot to play.", {entities = {}})
 registerprivilege("nextbot.faceTowards", "Face nextbot towards", "Allows the user to make a nextbot face a position.", {entities = {}})
 registerprivilege("nextbot.setRunAct", "Set nextbot run activity", "Allows the user to set nextbot's run animation.", {entities = {}})
 registerprivilege("nextbot.setIdleAct", "Set nextbot idle activity", "Allows the user to set nextbot's idle animation.", {entities = {}})
@@ -124,16 +124,9 @@ function nextbot_library.create(pos, mdl)
 	return nbwrap(nb)
 end
 
---- Removes the given nextbot.
-function nextbot_library:remove()
-	local nb = nbunwrap(self)
-	checkpermission(instance, nb, "nextbot.remove")
-	entList:remove(nb)
-end
-
---- Checks if a user can spawn anymore nextbots.
+--- Checks if you can spawn any more nextbots
 -- @server
--- @return boolean True if user can spawn nextbots, False if not.
+-- @return boolean Returns true if you can spawn nextbots, false if not
 function nextbot_library.canSpawn()
 	if not SF.Permissions.hasAccess(instance, nil, "nextbot.create") then return false end
 	return entList:check(instance.player) > 0
@@ -147,20 +140,28 @@ function nextbot_library.nextbotsLeft()
 	return entList:check(instance.player)
 end
 
---- Checks if a user can spawn anymore nextbots ragdolls.
+--- Checks if you can spawn any more nextbot ragdolls
 -- @server
--- @return boolean True if user can spawn nextbots ragdolls, False if not.
+-- @return boolean Returns true if you can spawn nextbot ragdolls, false if not
 function nextbot_library.canSpawnRagdoll()
 	if not SF.Permissions.hasAccess(instance, nil, "nextbot.ragdollOnDeath") then return false end
 	return SF.NextBotRagdolls:check(instance.player) > 0
 end
 
---- Checks how many ragdolls the nextbots can spawn.
+--- Returns how many nextbot ragdolls you can spawn
 -- @server
--- @return number Number how many ragdoll can be spawned.
+-- @return number Amount of nextbot ragdolls that can be spawned
 function nextbot_library.ragdollsLeft()
 	if not SF.Permissions.hasAccess(instance,  nil, "nextbot.ragdollOnDeath") then return 0 end
 	return SF.NextBotRagdolls:check(instance.player)
+end
+
+--- Removes the given nextbot.
+-- @server
+function nb_methods:remove()
+	local nb = nbunwrap(self)
+	checkpermission(instance, nb, "nextbot.remove")
+	entList:remove(nb)
 end
 
 --- Makes the nextbot try to go to a specified position without using navmesh pathfinding (in a straight line).

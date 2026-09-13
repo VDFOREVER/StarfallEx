@@ -135,6 +135,24 @@ builtins_library.ipairs = ipairs
 -- @return any Nil as current index (for the constructor)
 builtins_library.pairs = pairs
 
+--- Returns an iterator function for a for loop that will return the values of the specified table in a sorted order.
+-- @param table tbl Table to iterate over
+-- @param function? predicate A function that passes two entries to be sorted
+-- The entries are two tables representing the keyvalue pair of each entry
+-- e.g. The default predicate = function(a, b) return a[1]<b[1] end
+-- @return function Iterator function
+function builtins_library.sortedPairs(tbl, predicate)
+	checkluatype(tbl, TYPE_TABLE)
+	if predicate~=nil then checkluatype(predicate, TYPE_FUNCTION) else predicate = function(a,b) return a[1]<b[1] end end
+
+	local sortedTbl = {}
+	for k, v in pairs(tbl) do sortedTbl[#sortedTbl+1] = {k, v} end
+	table.sort(sortedTbl, predicate)
+
+	local i = 0
+	return function() i = i + 1 return unpack(sortedTbl[i] or {}) end
+end
+
 --- Returns a string representing the name of the type of the passed object.
 -- @name builtins_library.type
 -- @param any obj Object to get type of
@@ -232,7 +250,7 @@ builtins_library.CLIENT = CLIENT
 -- @class field
 builtins_library.SERVER = SERVER
 
---- Constant that denotes wether the code is executed on the owner's client
+--- Constant that denotes whether the code is executed on the owner's client
 -- @name builtins_library.OWNER
 -- @class field
 builtins_library.OWNER = CLIENT and instance.player == LocalPlayer()
@@ -548,7 +566,7 @@ end
 
 instance.argsToChat = argsToChat
 
--- here for compatiblity with older SF library addons - See note above
+-- here for compatibility with older SF library addons - See note above
 SF.argsToChat = argsToChat
 
 if SERVER then
@@ -570,7 +588,7 @@ if SERVER then
 	function builtins_library.print(...)
 		local data, strlen, size = argsToChat(...)
 		if instance.player == SF.Superuser then
-			MsgC("[SF] ", unpack(data), "\n")
+			MsgC("[SF] ", unpack(data)) MsgC("\n")
 			return
 		end
 		printBurst:use(instance.player, size)
@@ -650,9 +668,9 @@ if SERVER then
 		return concmdBurst:check(instance.player)
 	end
 
-	--- Returns how many concmds per second the user can run serverside
+	--- Returns how many concmds you can run per second on server-side
 	-- @server
-	-- @return number Number of concmds per second the user can run serverside
+	-- @return number Number of concmds per second the user can run on server-side
 	function builtins_library.concmdRate()
 		return concmdBurst.rate
 	end
@@ -937,24 +955,20 @@ function builtins_library.dodir(path, loadpriority)
 	return returns
 end
 
---- Like Lua 5.2 or LuaJIT's load/loadstring, except it has no mode parameter and, of course, the resulting function is in your instance's environment by default.
--- For compatibility with older versions of Starfall, loadstring is NOT an alias of this function like it is in vanilla Lua 5.2/LuaJIT.
+--- Similar to LuaJIT/5.2's `loadstring`/`load` functions, except it has no `mode` parameter and, of course, the resulting function is in your instance's environment by default.
+-- For compatibility with older versions of Starfall, `loadstring` is NOT an alias of this function like it is in vanilla LuaJIT/5.2.
 -- @param string code String to compile
 -- @param string? identifier Name of compiled function
 -- @param table? env Environment of compiled function
 -- @return function? Compiled function, or nil if failed to compile
 -- @return string? Error string, or nil if successfully compiled
-function builtins_library.loadstring(ld, source)
-	checkluatype(ld, TYPE_STRING)
-	if source == nil then
-		source = "=(load)"
-	else
-		checkluatype(source, TYPE_STRING)
-	end
-	source = "SF:"..source
-	local retval = SF.CompileString(ld, source, false)
+function builtins_library.loadstring(code, identifier, env)
+	checkluatype(code, TYPE_STRING)
+	if identifier ~= nil then checkluatype(identifier, TYPE_STRING) else identifier = "=(load)" end
+	if env ~= nil then checkluatype(env, TYPE_TABLE) end
+	local retval = SF.CompileString(code, "SF:" .. identifier, false)
 	if isfunction(retval) then
-		return setfenv(retval, instance.env)
+		return setfenv(retval, env or instance.env)
 	end
 	return nil, tostring(retval)
 end
@@ -1081,9 +1095,9 @@ end
 -- @return ... If an error occurred, this will be a string containing the error message. Otherwise, this will be the return values of the function passed in.
 function builtins_library.pcall(func, ...)
 	local vret, j = get_retvals_vararg(pcall(func, ...))
-	
+
 	if vret[1] then return unpack(vret, 1, j) end
-	
+
 	local err = vret[2]
 	if dgetmeta(err)==SF.Errormeta then
 		if err.userdata~=nil then
@@ -1094,7 +1108,7 @@ function builtins_library.pcall(func, ...)
 	elseif uncatchable[err] then
 		SF.Throw(err, 2, true)
 	end
-	
+
 	return false, instance.Sanitize({err})[1]
 end
 
@@ -1112,9 +1126,9 @@ end
 -- @return ... The returns of the first function if execution succeeded, otherwise the return values of the error callback.
 function builtins_library.xpcall(func, callback, ...)
 	local vret, j = get_retvals_vararg(xpcall(func, xpcall_Callback, ...))
-	
+
 	if vret[1] then return unpack(vret, 1, j) end
-	
+
 	local errData = vret[2]
 	local err, traceback = errData[1], errData[2]
 	if dgetmeta(err)==SF.Errormeta then

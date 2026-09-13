@@ -72,7 +72,7 @@ hook.Add("InitPostEntity","SF_SanitizeTypeMetatables",function()
 		end
 	end
 	sanitizeTypeMeta("", {__index = sf_string_index})
-	
+
 	if not (WireLib and WireLib.PatchedDuplicator) then
 		if WireLib then WireLib.PatchedDuplicator = true end
 
@@ -360,7 +360,7 @@ SF.LimitObject = {
 			counters = SF.EntityTable("limit"..cvarname)
 		}
 		getmetatable(t.counters).__index = function(t,k) t[k]=0 return 0 end
-		
+
 		scale = scale or 1
 		local maxname = "sf_"..cvarname.."_max"..(CLIENT and "_cl" or "")
 		SF.CvarCallback(CreateConVar(maxname, tostring(max), FCVAR_ARCHIVE, maxhelp), function(val) t.max = val*scale if t.max<0 then t.max = math.huge end end, "number")
@@ -581,16 +581,16 @@ end
 
 local function steamIdToConsoleSafeName(steamid)
 	local ply = player.GetBySteamID(steamid)
-	return Ent_IsValid(ply) and string.gsub(Ply_Nick(ply), '[%z\x01-\x1f\x7f;"\']', "") or ""
+	return ply and Ent_IsValid(ply) and string.gsub(Ply_Nick(ply), '[%z\x01-\x1f\x7f;"\']', "") or ""
 end
 
---- Returns a class that can keep a list of blocked users
-SF.BlockedList = {
+--- Returns a class that can keep a list of users
+SF.SavedUserList = {
 	__index = {
 		toline = function(self, steamid, name)
 			return steamid..","..name.."\n"
 		end,
-		block = function(self, steamid)
+		add = function(self, steamid)
 			if self.list[steamid] then return end
 			local name = steamIdToConsoleSafeName(steamid)
 			self.list[steamid] = name
@@ -605,7 +605,7 @@ SF.BlockedList = {
 				self.onblock(steamid)
 			end
 		end,
-		unblock = function(self, steamid)
+		remove = function(self, steamid)
 			if not self.list[steamid] then return end
 			self.list[steamid] = nil
 
@@ -621,7 +621,7 @@ SF.BlockedList = {
 				self.onunblock(steamid)
 			end
 		end,
-		isBlocked = function(self, steamid)
+		contains = function(self, steamid)
 			return self.list[steamid] ~= nil
 		end,
 		readFile = function(self)
@@ -638,7 +638,7 @@ SF.BlockedList = {
 		end
 	},
 	__call = function(p, prefix, desc, filename, onblock, onunblock)
-		local blocked = setmetatable({
+		local obj = setmetatable({
 			list = {},
 			filename = filename,
 			onblock = onblock,
@@ -646,37 +646,37 @@ SF.BlockedList = {
 		}, p)
 
 		if filename then
-			blocked:readFile()
+			obj:readFile()
 		end
 
-		SF.SteamIDConcommand("sf_"..prefix.."_block", function(executor, id)
-			blocked:block(id)
-		end, "Block a user from " .. desc, false)
+		SF.SteamIDConcommand("sf_"..prefix.."_add", function(executor, id)
+			obj:add(id)
+		end, "Add a user to list of " .. desc, false)
 
-		SF.SteamIDConcommand("sf_"..prefix.."_unblock", function(executor, id)
-			blocked:unblock(id)
-		end, "Unblock a user from " .. desc, false,
+		SF.SteamIDConcommand("sf_"..prefix.."_remove", function(executor, id)
+			obj:remove(id)
+		end, "Remove a user from list of " .. desc, false,
 		function(cmd)
 			local tbl = {}
-			for steamid, name in pairs(blocked.list) do
+			for steamid, name in pairs(obj.list) do
 				table.insert(tbl, cmd.." \""..steamid.."\" // \""..name.."\"")
 			end
 			return tbl
 		end)
 
-		concommand.Add("sf_"..prefix.."_blocklist", function(executor, cmd, args)
+		concommand.Add("sf_"..prefix.."_list", function(executor, cmd, args)
 			local n = 0
-			for steamid, name in pairs(blocked.list) do
+			for steamid, name in pairs(obj.list) do
 				print("\""..steamid.."\" // \""..name.."\"")
 				n = n + 1
 			end
-			print("You have blocked "..n.." players from "..desc)
-		end, nil, "List players you have blocked from " .. desc)
+			print(n.." players contained in list of "..desc)
+		end, nil, "List the contents of " .. desc)
 
-		return blocked
+		return obj
 	end
 }
-setmetatable(SF.BlockedList, SF.BlockedList)
+setmetatable(SF.SavedUserList, SF.SavedUserList)
 
 
 SF.Parent = {
@@ -767,7 +767,7 @@ SF.Parent = {
 					data:applyTransform()
 					data:applyParent()
 					cleanup = false
-					
+
 					local sfParent = Ent_GetTable(child).sfParent
 					if sfParent then
 						sfParent:fix()
@@ -923,7 +923,7 @@ SF.HttpTextureRequest = {
 
 				local content_type = headers["Content-Type"] or headers["content-type"]
 				local data = util.Base64Encode(body, true)
-				
+
 				self.url = table.concat({"data:", content_type, ";base64,", data})
 
 				self:load()
@@ -987,7 +987,7 @@ SF.HttpTextureRequest = {
 				timer.Simple(0, function() self:destroy(true) end)
 			end)
 		end,
-		
+
 		destroy = function(self, success)
 			if self:badnewstate(self.DESTROY) then return end
 			if success then
@@ -1047,7 +1047,7 @@ SF.HttpTextureLoader = {
 			self.queue:push(request)
 			self.request = self.request_postInit
 		end,
-		
+
 		request_postInit = function(self, request)
 			self.queue:push(request)
 			if request == self.queue:front() then self:nextRequest() end
@@ -1148,7 +1148,7 @@ do
 	local gmod_hooks = {}
 
 	local function getHookFunc(instances, hookname, customargfunc, customretfunc)
-		--- There are 4 varients of hookfunc depending on if there are custom callbacks
+		--- There are 4 variants of hookfunc depending on if there are custom callbacks
 		if customargfunc then
 			if customretfunc then
 				return function(...)
@@ -1266,7 +1266,7 @@ do
 	-- Takes values returned from starfall hook and returns what should be passed to the gmod hook
 	-- @param gmoverride Whether this hook should override the gamemode function (makes the hook run last, but adds a little overhead)
 	function SF.hookAdd(realname, hookname, customargfunc, customretfunc, gmoverride)
-		hookname = (hookname or realname):lower()
+		hookname = string.lower(hookname or realname)
 		registered_instances[hookname] = {}
 		if gmoverride then
 			local hookfunc = getHookFunc(registered_instances[hookname], hookname, customargfunc, customretfunc)
@@ -1310,7 +1310,7 @@ do
 			instances[instance] = true
 		end
 	end
-	
+
 	function SF.HookRemoveInstance(instance, hookname)
 		local instances = registered_instances[hookname]
 		if instances and instances[instance] then
@@ -1472,7 +1472,7 @@ SF.TYPENAME = {
 	[TYPE_MOVEDATA]         = "CMoveData",
 	[TYPE_RECIPIENTFILTER]  = "CRecipientFilter",
 	[TYPE_USERCMD]          = "CUserCmd",
-	[TYPE_SCRIPTEDVEHICLE]  = "ScriptedVehicle", -- Depricated, also TYPE Enum doesnt specify the name so this it is
+	[TYPE_SCRIPTEDVEHICLE]  = "ScriptedVehicle", -- Deprecated, also TYPE Enum doesn't specify the name so this it is
 	[TYPE_MATERIAL]         = "IMaterial",
 	[TYPE_PANEL]            = "Panel",
 	[TYPE_PARTICLE]         = "CLuaParticle",
@@ -1496,7 +1496,7 @@ SF.TYPENAME = {
 	[TYPE_PROJECTEDTEXTURE] = "ProjectedTexture",
 	[TYPE_PHYSCOLLIDE]      = "PhysCollide",
 	[TYPE_SURFACEINFO]      = "SurfaceInfo",
-	[TYPE_COLOR]            = "Color" -- TypeID doesnt return this but lets still add it
+	[TYPE_COLOR]            = "Color" -- TypeID doesn't return this but lets still add it
 }
 
 --- Returns corresponding name of the TypeID
@@ -1629,7 +1629,7 @@ do
 	local TYPE_NUMBER16NEG = 56
 	local TYPE_NUMBER32 = 57
 	local TYPE_NUMBER32NEG = 58
-	
+
 	local pairs_, instance_, tableLoopupCtr, tableLookup, ss
 
 	local typetostringfuncs = {}
@@ -1779,9 +1779,9 @@ do
 	stringtotypefuncs[TYPE_NUMBER16NEG] = function() return -ss:readUInt16() end
 	stringtotypefuncs[TYPE_NUMBER32] = function() return ss:readUInt32() end
 	stringtotypefuncs[TYPE_NUMBER32NEG] = function() return -ss:readUInt32() end
-	
+
 	--- Convert table to string data.
-	-- Only works with strings, numbers, tables, bools, 
+	-- Only works with strings, numbers, tables, bools,
 	function SF.TableToString(tbl, instance, sorted)
 		pairs_ = sorted and SortedPairs or pairs
 		instance_ = instance
@@ -1850,7 +1850,7 @@ SF.allowedRenderGroups = {
 function SF.CheckMaterial(material)
 	if material == "" then return end
 	if #material > 260 then return false end
-	material = string.StripExtension(SF.NormalizePath(string.lower(material)))
+	material = string.StripExtension(SF.NormalizePath(string.gsub(string.lower(material), "\x00.*", "")))
 	if materialBlacklist[material] then return false end
 	local mat = Material(material)
 	if shaderBlacklist[mat:GetShader() or ""] then return false end
@@ -1859,7 +1859,7 @@ end
 
 function SF.CheckModel(model, ply, prop)
 	if #model > 260 then SF.Throw("Model path too long!", 3) end
-	model = SF.NormalizePath(string.lower(model))
+	model = SF.NormalizePath(string.gsub(string.lower(model), "\x00.*", ""))
 	if string.GetExtensionFromFilename(model) ~= "mdl" or (SERVER and (not util.IsValidModel(model) or (prop and not util.IsValidProp(model)))) then SF.Throw("Invalid model: "..model, 3) end
 	if ply~=SF.Superuser and hook.Run("PlayerSpawnObject", ply, model)==false then SF.Throw("Not allowed to use model: "..model, 3) end
 	return model
@@ -1893,7 +1893,7 @@ end
 
 function SF.CheckRagdoll(model)
 	if #model > 260 then return false end
-	model = SF.NormalizePath(string.lower(model))
+	model = SF.NormalizePath(string.gsub(string.lower(model), "\x00.*", ""))
 	if util.IsValidRagdoll(model) then
 		return model
 	end
@@ -1984,27 +1984,24 @@ function SF.ParentChainTooLong(parent, child)
 end
 
 -- This function clamps the position before moving the entity
-local minx, miny, minz = -16384, -16384, -16384
-local maxx, maxy, maxz = 16384, 16384, 16384
 function SF.clampPos(pos)
-	pos.x = math_Clamp(pos.x, minx, maxx)
-	pos.y = math_Clamp(pos.y, miny, maxy)
-	pos.z = math_Clamp(pos.z, minz, maxz)
+	pos[1] = math_Clamp(pos[1], -16384, 16384)
+	pos[2] = math_Clamp(pos[2], -16384, 16384)
+	pos[3] = math_Clamp(pos[3], -16384, 16384)
 	return pos
 end
 
 function SF.CheckVector(v)
-	if v[1]<-1e12 or v[1]>1e12 or v[1]~=v[1] or
-	   v[2]<-1e12 or v[2]>1e12 or v[2]~=v[2] or
-	   v[3]<-1e12 or v[3]>1e12 or v[3]~=v[3] then
-
-		SF.Throw("Input vector too large or NAN", 3)
+	if v[1] < -1e12 or v[1] > 1e12 or v[1] ~= v[1] or
+	   v[2] < -1e12 or v[2] > 1e12 or v[2] ~= v[2] or
+	   v[3] < -1e12 or v[3] > 1e12 or v[3] ~= v[3] then
+		SF.Throw("Input vector too large or NaN", 3)
 	end
 end
 
 function SF.CheckNumber(n)
-	if n<-1e12 or n>1e12 or n~=n then
-		SF.Throw("Input number too large or NAN", 3)
+	if n < -1e12 or n > 1e12 or n ~= n then
+		SF.Throw("Input number too large or NaN", 3)
 	end
 end
 
@@ -2500,7 +2497,7 @@ do
 		end
 		return init
 	end
-	
+
 	local function addModule(name, path, shouldrun)
 		local source, init
 		if SERVER then
