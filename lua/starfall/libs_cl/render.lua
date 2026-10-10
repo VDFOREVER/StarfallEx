@@ -318,6 +318,7 @@ SF.hookAdd("PostDrawHUD", nil, function(instance)
 end, cleanupRender)
 
 --- Called before drawing the player. (Only works with HUD) (3D Context)
+-- Rendering using this hook may cause other effects or colors on the player to not work
 -- @name PreDrawPlayer
 -- @class hook
 -- @client
@@ -331,6 +332,22 @@ SF.hookAdd("PrePlayerDraw", "predrawplayer", function(instance, ply, flags)
 	end
 	return false
 end, cleanupRenderAllowTrueReturn)
+
+--- Return false to prevent rendering a player
+-- @name ShouldDrawPlayer
+-- @class hook
+-- @client
+-- @param Player ply Player that's about to be drawn
+-- @param number flags STUDIO flags for the render operation
+-- @return boolean Return false to prevent the player from drawing
+SF.hookAdd("PrePlayerDraw", "shoulddrawplayer", function(instance, ply, flags)
+	if canRenderHud(instance) then
+		return true, { instance.Types.Player.Wrap(ply), flags }
+	end
+	return false
+end, function(instance, args)
+	if args[1] and args[2]==false then return true end
+end)
 
 --- Called after drawing the player. (Only works with HUD) (3D Context)
 -- @name PostDrawPlayer
@@ -2496,6 +2513,7 @@ function render_library.renderView(tbl)
 	local origin, angles, w, h, ortho, offcenter
 	if tbl.origin~=nil then origin = vunwrap1(tbl.origin) end
 	if tbl.angles~=nil then angles = aunwrap1(tbl.angles) end
+	if tbl.aspect~=nil then checkluatype(tbl.aspect, TYPE_NUMBER) end
 	if tbl.aspectratio~=nil then checkluatype(tbl.aspectratio, TYPE_NUMBER) end
 	if tbl.x~=nil then checkluatype(tbl.x, TYPE_NUMBER) end
 	if tbl.y~=nil then checkluatype(tbl.y, TYPE_NUMBER) end
@@ -2591,7 +2609,7 @@ function render_library.renderView(tbl)
 	render.RenderView({
 		origin = origin,
 		angles = angles,
-		aspectratio = tbl.aspectratio,
+		aspect = tbl.aspect or tbl.aspectratio,
 		x = tbl.x,
 		y = tbl.y,
 		w = w,
